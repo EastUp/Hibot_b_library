@@ -1,0 +1,656 @@
+package com.xg.east.hibot_b_library.face_utils;
+
+import android.app.ProgressDialog;
+import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.ImageFormat;
+import android.graphics.Matrix;
+import android.graphics.Paint;
+import android.graphics.Rect;
+import android.graphics.YuvImage;
+import android.hardware.Camera;
+import android.os.Handler;
+import android.os.HandlerThread;
+import android.os.Parcelable;
+import android.util.Log;
+import android.view.Display;
+import android.view.Gravity;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
+import android.view.WindowManager;
+import android.widget.Toast;
+
+import com.faceplusplus.api.FaceDetecter;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+import com.xg.east.hibot_b_library.bean.DetectWithAttribute;
+import com.xg.east.hibot_b_library.bean.WW;
+import com.xg.east.hibot_b_library.utils.PictureUtil;
+import com.xg.east.hibot_b_library.utils.ScreenUtils;
+import com.xg.east.hibot_b_library.utils.ShowLog;
+import com.xg.east.hibot_b_library.utils.UsefulUtil;
+import com.zhy.http.okhttp.OkHttpUtils;
+import com.zhy.http.okhttp.callback.StringCallback;
+
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import okhttp3.Call;
+import okhttp3.OkHttpClient;
+
+import static com.xg.east.hibot_b_library.face_utils.FaceDiscernUtil.APIID;
+import static com.xg.east.hibot_b_library.face_utils.FaceDiscernUtil.APISecret;
+
+//import android.hardware.Camera;
+
+/**
+ * 项目名称：Test
+ * 创建人：East
+ * 创建时间：2017/4/7 15:18
+ * 邮箱：EastRiseWM@163.com
+ */
+
+public class FaceUtils implements  SurfaceHolder.Callback, Camera.PreviewCallback {
+    private Context mContext;
+    private SurfaceView surfaceView_preview;
+    SurfaceHolder surfaceHolder;
+    Camera camera;
+    Handler handler;
+    HandlerThread handlerThread;
+    SurfaceHolder holder;
+    private int width;
+    private int height;
+    int BACK_CAMERA = 0;
+    int FRONT_CAMERA = 1;
+    int cameraState = FRONT_CAMERA;//1为前置摄像头，0为后置摄像头
+    Bitmap tem, tem2;
+    byte[] tmp;
+    Bitmap bmp;
+    boolean previewing = false;//是否正在检测
+    public FaceDetecter faceDetecter = null;
+    public int widthDistance = 180, heightDistance = 90;//头部转的度数和平板上移动的距离的关系
+    public FaceDiscernUtil mFaceDiscernUtil;/*人脸识别的工具类*/
+    private int screenWidth = 0, screenHeight = 0;/*屏幕的宽高*/
+    private boolean canUse = false;//摄像头是否可用
+    private MainPresenter2 mPresenter2;
+    private static FaceUtils mFaceUtils;
+    public boolean isFaceFollow=false;//是否在人脸跟踪
+    public OnFaceListener mOnFaceListener;//人脸信息监听器
+    private ProgressDialog mProgressDialog;
+    private List<WW.FacesEntity> faces;
+    private boolean isFindFace = false;
+    private String faceId;
+    private String personId;
+    public boolean faceFollowEnable=false;
+
+    private  FaceUtils() {
+    }
+
+    public static FaceUtils getInstance(){
+        if(mFaceUtils==null){
+            mFaceUtils=new FaceUtils();
+        }
+        return mFaceUtils;
+    }
+
+    /**     初始化数据
+     * @param context   上下文
+     */
+    public void initData(Context context){
+        OkHttpClient okHttpClient = new OkHttpClient.Builder()
+//                .addInterceptor(new LoggerInterceptor("TAG"))
+                .connectTimeout(10000L, TimeUnit.MILLISECONDS)
+                .readTimeout(10000L, TimeUnit.MILLISECONDS)
+                //其他配置
+                .build();
+        OkHttpUtils.initClient(okHttpClient);
+
+
+        mContext=context;
+        mPresenter2=new MainPresenter2(context);
+        screenWidth = ScreenUtils.getScreenWidth(context);
+        screenHeight = ScreenUtils.getScreenHeight(context);
+        handler = new Handler(/*handlerThread.getLooper()*/);
+        surfaceView_preview = new SurfaceView(mContext);
+        surfaceHolder = surfaceView_preview.getHolder();
+        surfaceHolder.addCallback(this);
+        surfaceView_preview.setKeepScreenOn(true);
+        surfaceView_preview = new SurfaceView(context);
+        FloatWindowUtils.addView(context, surfaceView_preview, Gravity.TOP | Gravity.RIGHT, false);
+        mFaceDiscernUtil = FaceDiscernUtil.getInstance();
+        mFaceDiscernUtil.setDiscernResult(new FaceDiscernUtil.DiscernResult() {
+            @Override
+            public void dealDiscernResult(String result, DetectWithAttribute.FacesBean.AttributesBean attributesBean) {
+                mOnFaceListener.dealDiscernResult(result,attributesBean);
+            }
+
+            @Override
+            public void incognizant() {
+                mOnFaceListener.incognizant();
+            }
+        });
+        //初始化检测器
+        faceDetecter = new FaceDetecter();
+        if (!faceDetecter.init(context, "fb198f15357a0bb25a00dbe71a53c721")) {
+            Log.d("检测器初始化", "有错误");
+        }
+    }
+
+    /**     初始化数据
+     * @param context           上下文
+     * @param onFaceListener    人脸监听
+     */
+    public void initData(Context context,OnFaceListener onFaceListener){
+        mOnFaceListener=onFaceListener;
+//        OkHttpClient okHttpClient = new OkHttpClient.Builder()
+////                .addInterceptor(new LoggerInterceptor("TAG"))
+//                .connectTimeout(10000L, TimeUnit.MILLISECONDS)
+//                .readTimeout(10000L, TimeUnit.MILLISECONDS)
+//                //其他配置
+//                .build();
+//
+//        OkHttpUtils.initClient(okHttpClient);
+        mContext=context;
+        mPresenter2=new MainPresenter2(context);
+        screenWidth = ScreenUtils.getScreenWidth(context);
+        screenHeight = ScreenUtils.getScreenHeight(context);
+        handler = new Handler(/*handlerThread.getLooper()*/);
+        surfaceView_preview = new SurfaceView(mContext);
+        surfaceHolder = surfaceView_preview.getHolder();
+        surfaceHolder.addCallback(this);
+        surfaceView_preview.setKeepScreenOn(true);
+        surfaceView_preview = new SurfaceView(context);
+        FloatWindowUtils.addView(context, surfaceView_preview, Gravity.TOP | Gravity.RIGHT, false);
+        mFaceDiscernUtil = FaceDiscernUtil.getInstance();
+        mFaceDiscernUtil.setDiscernResult(new FaceDiscernUtil.DiscernResult() {
+            @Override
+            public void dealDiscernResult(String result, DetectWithAttribute.FacesBean.AttributesBean attributesBean) {
+                mOnFaceListener.dealDiscernResult(result,attributesBean);
+//                mDiscernResult.dealDiscernResult(result,attributesBean);
+            }
+
+            @Override
+            public void incognizant() {
+                mOnFaceListener.incognizant();
+//                mDiscernResult.incognizant();
+            }
+        });
+        //初始化检测器
+        faceDetecter = new FaceDetecter();
+        if (!faceDetecter.init(context, "fb198f15357a0bb25a00dbe71a53c721")) {
+            Log.d("检测器初始化", "有错误");
+        }
+    }
+
+    /** 设置人脸监听
+     * @param onFaceListener
+     */
+    public void setOnFaceListener(OnFaceListener onFaceListener){
+        mOnFaceListener=onFaceListener;
+    }
+
+
+    /**
+     * 打开摄像头并开启人脸跟踪
+     */
+    public void openCameraAndFaceFollow(){
+        try {
+            faceFollowEnable=true;
+            isFaceFollow=true;
+            FloatWindowUtils.clear();
+            surfaceView_preview = new SurfaceView(mContext);
+            surfaceHolder = surfaceView_preview.getHolder();
+            surfaceHolder.addCallback(this);
+            surfaceView_preview.setKeepScreenOn(true);
+            FloatWindowUtils.addView(mContext, surfaceView_preview, Gravity.TOP | Gravity.RIGHT, false);
+            initCamera();
+        } catch (Exception e) {
+            isFaceFollow=false;
+            Toast.makeText(mContext, e.getMessage(), Toast.LENGTH_SHORT).show();
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * 重新开启人脸跟踪
+     */
+    public void restartFaceFollow(){
+        if(!faceFollowEnable)
+            faceFollowEnable=true;
+    }
+
+    /**
+     * 停止人脸跟踪，但是摄像头还是开着
+     */
+    public void stopFaceFollow(){
+        faceFollowEnable=false;
+    }
+
+    /**
+     * 关闭人脸跟踪也会关闭摄像头
+     */
+    public void closeFaceFollowAndCamera(){
+        closeCamera();
+        FloatWindowUtils.clear();
+        isFaceFollow=false;
+    }
+
+    /**
+     * 开始人脸识别
+     */
+    public void startFaceDiscern(){
+        mFaceDiscernUtil.startFaceDiscern();
+    }
+
+    /**
+     * 根据人脸运到人跟前（比如语音指令（你过来））
+     */
+    public void runWithFaceFollow(){
+        if(camera!=null && isFaceFollow && faceFollowEnable)
+            mPresenter2.IsfaceFollowWithBody=true;
+        else
+            Toast.makeText(mContext, "请开启人脸跟踪", Toast.LENGTH_SHORT).show();
+    }
+
+
+
+
+    @Override
+    public void onPreviewFrame(final byte[] data, final Camera camera) {
+        ShowLog.d("test-onPreviewFrame", "运行中1");
+        mOnFaceListener.onPreviewFrame(data,camera);
+        handler.post(new Runnable() {
+            FaceDetecter.Face[] faceinfo = null;
+            @Override
+            public void run() {
+                if (faceFollowEnable) {
+                    ShowLog.d("Timer10detecTtest-handler1", "运行中2");
+                    if (cameraState == FRONT_CAMERA) {
+                    } else {
+                        if (camera != null) {
+                            Bitmap tem2 = yuv2bitmap(data, camera);
+                            if (tem2 != null && !tem2.isRecycled()) {
+                                Bitmap comp = PictureUtil.comp(tem2, 120f, 160f);
+                                ShowLog.d("Timer101", "压缩完毕");
+                                if (comp != null) {
+                                    faceinfo = faceDetecter.findFaces(comp);
+                                }
+                            }
+                            if (tem2 != null && !tem2.isRecycled()) {
+                                tem2.recycle();
+                                tem2 = null;
+                            }
+                        }
+                        ShowLog.d("Timer101detecT-hand", "后置摄像头检测人脸中");
+                    }
+                    ShowLog.v("Timer102onpreview", "UI运行");
+                    if(faceinfo==null)
+                        mOnFaceListener.onFindFace(false);
+                    else
+                        mOnFaceListener.onFindFace(true);
+                    mPresenter2.setFaceInfo(faceinfo);
+                    int left = 0;
+                    int right = screenWidth;
+                    int top = 0;
+                    int bottom = screenHeight;
+                    ShowLog.v("Timer103","left--right");
+                    mPresenter2.startFaceDetect(left, right, top, bottom, widthDistance, heightDistance);/*人脸跟踪的代码实现*/
+                }
+            }
+        });
+        ShowLog.v("Timer104","sdsadsa");
+        mFaceDiscernUtil.dealFaceAtOnPreview(data, camera,mContext, cameraState);
+    }
+
+    @Override
+    public void surfaceCreated(SurfaceHolder holder) {
+
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
+        if (camera != null) {
+            this.holder = holder;
+            //       设置摄像头的预览参数
+            try {
+                camera.setPreviewDisplay(holder);
+                Camera.Parameters mParameters = camera.getParameters();
+                mParameters.setPreviewSize(320, 240);
+                camera.setParameters(mParameters);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            camera.startPreview();
+            camera.setPreviewCallback(this);
+            previewing = true;
+            Log.v("surfaceChanged", "运行中");
+        } else {
+            Log.v("camera", "Camera is null");
+        }
+    }
+
+    @Override
+    public void surfaceDestroyed(SurfaceHolder holder) {
+
+    }
+
+    /** 把yuv转换成bitmap
+     * @param mData
+     * @param myCamera
+     * @return
+     */
+    public Bitmap yuv2bitmap(byte[] mData, Camera myCamera) {
+        try {
+            if (canUse) {
+                Camera.Size size = myCamera.getParameters().getPreviewSize(); //获取预览大小
+                final int w = size.width;  //宽度
+                final int h = size.height;
+                //            final int w = 640;  //宽度
+                //            final int h = 480;
+                ShowLog.d("size", w + ":" + h + "");
+                final YuvImage image = new YuvImage(mData, ImageFormat.NV21, w, h, null);
+                ByteArrayOutputStream os = new ByteArrayOutputStream(mData.length);
+                if (!image.compressToJpeg(new Rect(0, 0, w, h), 100, os)) {
+                    return null;
+                }
+                tmp = os.toByteArray();
+                bmp = BitmapFactory.decodeByteArray(tmp, 0, tmp.length);
+                tmp = null;
+                return bmp;
+            } else {
+                return null;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+
+    /**
+     * 初始化摄像头
+     */
+    private synchronized void initCamera() {
+        //       获取相机对象，设置摄像头参数
+//        camera = Camera.open(cameraState);
+        cameraState = BACK_CAMERA;
+
+        camera = Camera.open(cameraState);
+        canUse = true;
+        ShowLog.v("cameraNub", Camera.getNumberOfCameras() + "");
+        Camera.getNumberOfCameras();
+        WindowManager wm = (WindowManager) mContext.getSystemService(Context.WINDOW_SERVICE);
+        Display display = wm.getDefaultDisplay();
+        ShowLog.v("display", display.getWidth() + "--" + display.getHeight());
+        Camera.Parameters pars = camera.getParameters();
+        List<Camera.Size> supportedPreviewSizes = pars.getSupportedPreviewSizes();
+        for (int ii = 0; ii < supportedPreviewSizes.size(); ii++) {
+            ShowLog.v("size", supportedPreviewSizes.get(ii).width + "宽" + supportedPreviewSizes.get(ii).height + "高");
+        }
+//实际测试如果预览图像的分辨率太大，识别速度大大降低，所以手动设置了下
+        width = 320;
+        height = 240;
+//        width = 640;
+//        height = 480;
+        pars.setPreviewSize(width, height);
+//        camera.setParameters(pars);
+//        Camera.Size size = camera.getParameters().getPreviewSize();
+//        width = size.width;
+//        height = size.height;
+//        camera.getParameters().setPreviewSize(320,240);
+//        ShowLog.v("Size",width+"--"+height+"--"+camera.getParameters().getPreviewSize().width);
+
+        Camera.Size size = camera.getParameters().getPreviewSize();
+        width=size.width;
+        height=size.height;
+        Log.d("Size",width+"--"+height+"--"+camera.getParameters().getPreviewSize().width);
+    }
+
+
+    /**
+     * 关闭摄像头
+     */
+    private synchronized void closeCamera() {
+        try {
+            if (camera != null) {
+                canUse = false;
+                camera.setPreviewCallback(null);
+                camera.stopPreview();
+                camera.release();
+                camera = null;
+                previewing = false;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            closeCamera();
+        }
+    }
+
+    /**     人脸录入（注意：如果一张图片有多张人脸只录入图片中人脸最大的人）
+     * @param img   人脸录入需要的图片
+     * @param name  保存的人名
+     */
+    public void faceEntry(final Context mContext, final Bitmap img, final String name) {
+        PictureUtil.deleteChildFile(new File("/sdcard/myFolder"));
+        String fileName=PictureUtil.saveImage(img,"faceSave");
+        mProgressDialog = new ProgressDialog(mContext);
+        mProgressDialog.setMessage("正在检测人脸，请稍等...");
+        mProgressDialog.setCancelable(false);
+        mProgressDialog.show();
+        if (UsefulUtil.isOnline(mContext)) {
+            OkHttpUtils.post()
+                    .url("https://v1-api.visioncloudapi.com/face/detection")
+                    .addParams("api_id", APIID)
+                    .addParams("api_secret", APISecret)
+                    .addFile("file", fileName, new File(fileName))
+                    .build()
+                    .execute(new StringCallback() {
+                        @Override
+                        public void onError(Call call, Exception e, int id) {
+                            mProgressDialog.dismiss();
+                            Toast.makeText(mContext, "请求失败", Toast.LENGTH_SHORT).show();
+                        }
+
+                        @Override
+                        public void onResponse(String response, int id) {
+                            ShowLog.v("AddDetectResult", response);
+//                            mProgressDialog.dismiss();
+                            WW ww = new Gson().fromJson(response, new TypeToken<WW>() {
+                            }.getType());
+                            faces = ww.getFaces();
+                            if (faces.size() > 0) {//检测到有人脸
+                                isFindFace = true;
+                                Paint paint = new Paint();
+                                paint.setColor(Color.GREEN);
+                                paint.setStrokeWidth(3);
+
+                                //create a new canvas
+                                Bitmap bitmap = Bitmap.createBitmap(img.getWidth(), img.getHeight(), img.getConfig());
+                                Canvas canvas = new Canvas(bitmap);
+                                canvas.drawBitmap(img, new Matrix(), null);
+                                int index = 0;
+                                faceId = faces.get(0).getFace_id();
+                                int Distance = faces.get(0).getRect().getRight() - faces.get(0).getRect().getLeft();
+                                for (int j = 1; j < faces.size(); j++) {
+                                    int two = faces.get(j).getRect().getRight() - faces.get(j).getRect().getLeft();
+                                    if (two > Distance) {
+                                        index = j;
+                                        faceId = faces.get(j).getFace_id();
+                                        Distance = two;
+                                    }
+                                }
+                                WW.FacesEntity facesEntity = faces.get(index);
+                                //use the red paint
+                                WW.FacesEntity.RectEntity rect = facesEntity.getRect();
+                                canvas.drawLine(rect.getLeft(), rect.getTop(), rect.getRight(), rect.getTop(), paint);
+                                canvas.drawLine(rect.getLeft(), rect.getBottom(), rect.getRight(), rect.getBottom(), paint);
+                                canvas.drawLine(rect.getLeft(), rect.getTop(), rect.getLeft(), rect.getBottom(), paint);
+                                canvas.drawLine(rect.getRight(), rect.getTop(), rect.getRight(), rect.getBottom(), paint);
+                                Bitmap detectedImg = bitmap;
+                                mOnFaceListener.getDetectedImg(detectedImg);
+                                saveAddFace(mContext,name);
+                            } else {//未检测到人脸
+                                mProgressDialog.dismiss();
+                                Toast.makeText(mContext, "没有发现人脸！！", Toast.LENGTH_LONG).show();
+                                isFindFace = false;
+                            }
+                        }
+                    });
+        } else {
+            mProgressDialog.dismiss();
+            Toast.makeText(mContext, "请检查网络连接", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void saveAddFace(final Context mContext, final String name) {
+        if (UsefulUtil.isOnline(mContext)) {
+            mProgressDialog.setMessage("正在人脸录入中.....");
+            OkHttpUtils.post()
+                    .url("https://v1-api.visioncloudapi.com/person/create")
+                    .addParams("api_id", APIID)
+                    .addParams("api_secret", APISecret)
+                    .addParams("face_id", faceId)
+                    .addParams("name", name)
+                    .build()
+                    .execute(new StringCallback() {
+                        @Override
+                        public void onError(Call call, Exception e, int id) {
+                            mProgressDialog.dismiss();
+                            Toast.makeText(mContext, "请求失败", Toast.LENGTH_SHORT).show();
+                        }
+                        @Override
+                        public void onResponse(String response, int id) {
+                            ShowLog.v("StringPostResult", response);
+                            try {
+                                JSONObject object = new JSONObject(response);
+                                personId = object.getString("person_id");
+                                OkHttpUtils.post()
+                                        .url("https://v1-api.visioncloudapi.com/group/add_person")
+                                        .addParams("api_id", APIID)
+                                        .addParams("api_secret", APISecret)
+                                        .addParams("group_id", "744900ef63704de7b7b98efce839e9e2")
+                                        .addParams("person_id", personId)
+                                        .build()
+                                        .execute(new StringCallback() {
+                                            @Override
+                                            public void onError(Call call, Exception e, int id) {
+//                                                ShowLog.v("error", e.getMessage());
+                                                mProgressDialog.dismiss();
+                                                Toast.makeText(mContext, "请求失败", Toast.LENGTH_SHORT).show();
+                                            }
+                                            @Override
+                                            public void onResponse(String response, int id) {
+                                                mProgressDialog.dismiss();
+//                                                ShowLog.v("isAddToGroup", response);
+                                                try {
+                                                    JSONObject obj = new JSONObject(response);
+                                                    String status = obj.getString("status");
+                                                    if (status.equalsIgnoreCase("OK")) {
+                                                        mOnFaceListener.onFaceEntrySuccessed();
+                                                    }else
+                                                        Toast.makeText(mContext, "录入失败", Toast.LENGTH_SHORT).show();
+                                                } catch (JSONException e) {
+                                                    e.printStackTrace();
+                                                }
+                                            }
+                                        });
+                                OkHttpUtils.post()
+                                        .url("https://v1-api.visioncloudapi.com/face/training")
+                                        .addParams("api_id", APIID)
+                                        .addParams("api_secret", APISecret)
+                                        .addParams("person_id", personId)
+                                        .build()
+                                        .execute(new StringCallback() {
+                                            @Override
+                                            public void onError(Call call, Exception e, int id) {
+//                                                ShowLog.v("error", e.getMessage());
+                                                Toast.makeText(mContext, "请求失败", Toast.LENGTH_SHORT).show();
+                                            }
+
+                                            @Override
+                                            public void onResponse(String response, int id) {
+
+                                            }
+                                        });
+                            } catch (JSONException e) {
+                                e.printStackTrace();
+                            }
+                        }
+                    });
+        } else {
+            mProgressDialog.dismiss();
+            Toast.makeText(mContext, "请检查网络连接", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+
+
+    /**
+     * 人脸的回调接口
+     */
+    public interface OnFaceListener extends Parcelable {
+
+        /**
+         * @param data  摄像头的预览数据
+         * @param camera 照相机实例
+         */
+        void onPreviewFrame( byte[] data, final Camera camera);
+
+        /**
+         * @param findFace  是否检测到人脸
+         */
+        void onFindFace(boolean findFace);
+
+        /**
+         *   根据人脸运到到人跟前
+         *
+         * @param state 停止时的状态（0：已经到了人跟前
+         *                            1：红外检测到了障碍物
+         *                            2：底盘发生了碰撞   ）
+         */
+        void onFaceFllowWithMoving(int state);
+
+        /**
+         * @param bitmap 获取人脸检测后的图片（在原图上用绿色框框住人脸的图片）
+         */
+        void getDetectedImg(Bitmap bitmap);
+
+        /**
+         * 保存人脸成功的回调
+         */
+        void onFaceEntrySuccessed();
+
+        /**
+         * @param result            识别到的人名
+         * @param attributesBean    人脸的一些属性：
+         *   age	integer	年龄
+         *  gender	integer	性别，值为 0~100，小于 50 代表女性，反之代表男性
+         *  attractive	integer	颜值，值为 0~100，值越大，表示颜值越高。
+         *  eyeglass	integer	戴眼镜，值为 0~100，小于 50 代表未戴眼镜，反之代表戴眼镜
+         *  sunglass	integer	戴墨镜，值为 0~100，小于 50 代表未戴墨镜，反之代表戴墨镜
+         *  smile	integer	微笑的程度，值为 0~100，越大代表微笑程度越深
+         *  mask	integer	戴口罩，值为 0~100，小于 50 代表未戴口罩，反之代表戴口罩
+         *  eye_open	integer	睁眼，值为 0~100，小于 50 代表闭眼，反之代表睁眼
+         *  beard	integer	胡须，值为 0~100，小于 50 代表无胡须，反之代表有胡须
+         *  mouth_open	integer	张嘴，值为 0~100，小于 50 代表闭嘴状态，反之代表张嘴状态
+         */
+        void dealDiscernResult(String result, DetectWithAttribute.FacesBean.AttributesBean attributesBean);/**/
+
+        /**
+         * 数据库中没有该人脸
+         */
+        void incognizant();
+    }
+
+
+}

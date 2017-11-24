@@ -1,0 +1,86 @@
+apply plugin: 'com.android.library'
+//apply plugin: 'com.jfrog.bintray'
+//apply plugin: 'com.github.dcendents.android-maven'
+android {
+    compileSdkVersion 25
+    buildToolsVersion '26.0.2'
+
+    defaultConfig {
+        minSdkVersion 16
+        targetSdkVersion 25
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
+
+//        externalNativeBuild {
+//            cmake {
+//                cppFlags ""
+//            }
+//        }
+    }
+    buildTypes {
+        debug {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    sourceSets {
+        main {
+            java.srcDirs = ['src/main/java', 'src/main/aidl']
+        }
+    }
+
+    lintOptions {
+        abortOnError false
+    }
+
+//    externalNativeBuild {
+//        cmake {
+//            path "CMakeLists.txt"
+//        }
+//    }
+
+}
+
+
+dependencies {
+    compile fileTree(include: ['*.jar'], dir: 'libs')
+    androidTestCompile('com.android.support.test.espresso:espresso-core:2.2.2', {
+        exclude group: 'com.android.support', module: 'support-annotations'
+    })
+    compile 'com.android.support:appcompat-v7:25.3.1'
+    testCompile 'junit:junit:4.12'
+    compile 'com.blackbox.lerist.library:VoiceInvoker:1.0.5'
+    compile 'com.zhy:okhttputils:2.6.2'
+    compile 'com.loopj.android:android-async-http:1.4.9'
+    compile 'com.google.code.gson:gson:2.2.4'
+    compile 'com.lzy.net:okgo:3.0.4'
+//    compile 'cz.msebera.android:httpclient:4.3.6'
+}
+//引入bintrayUpload.gradle脚本
+//apply from: "bintray.gradle"
+
+def SDK_BASENAME = "hibot-b-libs";
+def SDK_VERSION = "_v1.0";
+def sdkDestinationPath = "build/libs/";
+def zipFile = file('build/intermediates/bundles/release/classes.jar')
+
+task deleteBuild(type: Delete) {
+    delete sdkDestinationPath + SDK_BASENAME + SDK_VERSION + ".jar"
+}
+
+task makeJarB(type: Jar) {
+    from zipTree(zipFile)
+    from fileTree(dir: 'src/main', includes: ['assets/**']) // 打包assets目录下的所有文件
+    baseName = SDK_BASENAME + SDK_VERSION
+    destinationDir = file(sdkDestinationPath)
+}
+
+makeJarB.dependsOn(deleteBuild, build)
+
+

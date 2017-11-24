@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="com.xg.east.hibot_b_library">
+
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES"/>
+    //usb权限
+    <uses-permission android:name="android.hardware.usb.host"/>
+
+    <uses-feature
+        android:name="android.hardware.usb.host"
+        android:required="true"/>
+    //照相机权限
+    <uses-permission android:name="android.permission.CAMERA"/>
+
+    <uses-feature android:name="android.hardware.camera"/>
+    <uses-feature android:name="android.hardware.camera.autofocus"/>
+
+    <application
+        android:allowBackup="true"
+        android:label="@string/app_name"
+        android:supportsRtl="true">
+        <service
+            android:name=".service.CommunicateService"
+            android:enabled="true"
+            android:exported="true"
+            android:process=":communicateService">
+
+            <!-- 为防止Service被系统回收，可以通过提高优先级解决，1000是最高优先级，数字越小，优先级越低 -->
+            <intent-filter android:priority="1000">
+                <action android:name="com.xg.east.hibot_b_library.service.CommunicateService"/>
+            </intent-filter>
+            <!-- <meta-data -->
+            <!-- android:name="android.hardware.usb.action.USB_DEVICE_ATTACHED" -->
+            <!-- android:resource="@xml/device_filter" /> -->
+        </service>
+        <service
+            android:name=".service.FaceService"
+            android:enabled="true"
+            android:exported="true"
+            android:process=":faceService">
+            <intent-filter android:priority="1000">
+                <action android:name="com.xg.east.hibot_b_library.service.FaceService"/>
+            </intent-filter>
+        </service>
+    </application>
+
+</manifest>

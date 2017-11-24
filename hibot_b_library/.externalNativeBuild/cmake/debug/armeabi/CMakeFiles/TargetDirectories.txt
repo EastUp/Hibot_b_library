@@ -1,0 +1,3 @@
+F:/AndroidStudioProjects/Test/hibot_b_library/.externalNativeBuild/cmake/debug/armeabi/CMakeFiles/rebuild_cache.dir
+F:/AndroidStudioProjects/Test/hibot_b_library/.externalNativeBuild/cmake/debug/armeabi/CMakeFiles/serial_port.dir
+F:/AndroidStudioProjects/Test/hibot_b_library/.externalNativeBuild/cmake/debug/armeabi/CMakeFiles/edit_cache.dir

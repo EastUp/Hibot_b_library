@@ -1,0 +1,22 @@
+# ninja log v5
+1	1087	0	CMakeFiles/serial_port.dir/src/main/cpp/serial_port.c.o	61b126c554ea725e
+1088	1659	0	../../../../build/intermediates/cmake/release/obj/x86_64/libserial_port.so	1356764c6ce4101b
+2	106	0	CMakeFiles/serial_port.dir/src/main/cpp/serial_port.c.o	61b126c554ea725e
+106	197	0	../../../../build/intermediates/cmake/release/obj/x86_64/libserial_port.so	1356764c6ce4101b
+129	881	0	CMakeFiles/serial_port.dir/src/main/cpp/serial_port.c.o	61b126c554ea725e
+882	1486	0	../../../../build/intermediates/cmake/release/obj/x86_64/libserial_port.so	1356764c6ce4101b
+2	874	0	CMakeFiles/serial_port.dir/src/main/cpp/serial_port.c.o	61b126c554ea725e
+874	1416	0	../../../../build/intermediates/cmake/release/obj/x86_64/libserial_port.so	1356764c6ce4101b
+12	750	0	CMakeFiles/serial_port.dir/src/main/cpp/serial_port.c.o	61b126c554ea725e
+750	1304	0	../../../../build/intermediates/cmake/release/obj/x86_64/libserial_port.so	1356764c6ce4101b
+1	816	0	CMakeFiles/serial_port.dir/src/main/cpp/serial_port.c.o	61b126c554ea725e
+816	1399	0	../../../../build/intermediates/cmake/release/obj/x86_64/libserial_port.so	1356764c6ce4101b
+1	866	0	build.ninja	576446ba2c0adad7
+2	1501	0	CMakeFiles/serial_port.dir/src/main/cpp/serial_port.c.o	a5f80b633cd1d215
+1502	3505	0	../../../../build/intermediates/cmake/release/obj/x86_64/libserial_port.so	11a5d3f1fb818d52
+125	540	0	CMakeFiles/serial_port.dir/src/main/cpp/serial_port.c.o	a5f80b633cd1d215
+540	1290	0	../../../../build/intermediates/cmake/release/obj/x86_64/libserial_port.so	11a5d3f1fb818d52
+723	3559	0	CMakeFiles/serial_port.dir/src/main/cpp/serial_port.c.o	a5f80b633cd1d215
+3639	7774	0	../../../../build/intermediates/cmake/release/obj/x86_64/libserial_port.so	11a5d3f1fb818d52
+44	1135	0	CMakeFiles/serial_port.dir/src/main/cpp/serial_port.c.o	a5f80b633cd1d215
+1135	3697	0	../../../../build/intermediates/cmake/release/obj/x86_64/libserial_port.so	11a5d3f1fb818d52
